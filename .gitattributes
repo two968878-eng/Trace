@@ -1,2 +1,864 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trace</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    background: #F7F7F5;
+    color: #1A1A1A;
+    min-height: 100vh;
+  }
+
+  .app { max-width: 420px; margin: 0 auto; padding: 0 0 80px; }
+
+  .header {
+    padding: 20px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .header-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .last-record { font-size: 12px; color: #999; }
+
+  .date-bar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; padding: 0 20px 14px;
+  }
+
+  .date-nav {
+    width: 28px; height: 28px; border-radius: 8px;
+    border: 1px solid #E0E0DC; background: #fff;
+    font-size: 14px; color: #999; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  input[type="date"].date-picker-inline {
+    font-size: 13px; font-weight: 500; color: #1A1A1A;
+    padding: 4px 10px; border-radius: 8px;
+    border: 1px solid #E0E0DC; background: #fff;
+    font-family: inherit; cursor: pointer;
+  }
+
+  input[type="date"].date-picker-inline:focus { outline: none; border-color: #aaa; }
+
+  .date-today-btn {
+    font-size: 11px; color: #aaa;
+    background: none; border: none; cursor: pointer; padding: 2px 6px;
+  }
+
+  .tabs {
+    display: flex; padding: 0 20px; margin-bottom: 20px;
+    border-bottom: 1px solid #E8E8E5;
+  }
+
+  .tab {
+    font-size: 13px; font-weight: 500; padding: 10px 16px;
+    cursor: pointer; color: #999;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    background: none; border-top: none; border-left: none; border-right: none;
+    transition: color 0.15s;
+  }
+
+  .tab.active { color: #1A1A1A; border-bottom-color: #1A1A1A; }
+
+  .card {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #E8E8E5; margin: 0 16px 12px; overflow: hidden;
+  }
+
+  .card-section { padding: 14px 16px; border-bottom: 1px solid #F0F0ED; }
+  .card-section:last-child { border-bottom: none; }
+
+  .section-label { font-size: 10px; color: #aaa; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+  .section-sublabel { font-size: 11px; color: #bbb; margin-bottom: 10px; }
+
+  .rating-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rating-row:last-child { margin-bottom: 0; }
+  .rating-name { font-size: 12px; color: #666; width: 78px; flex-shrink: 0; }
+  .rating-buttons { display: flex; gap: 5px; }
+
+  .rating-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid #E0E0DC; background: #fff;
+    font-size: 11px; color: #bbb; cursor: pointer;
+    transition: all 0.1s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .rating-btn.selected { background: #1A1A1A; border-color: #1A1A1A; color: #fff; font-weight: 600; }
+
+  textarea {
+    width: 100%; font-size: 14px; line-height: 1.7;
+    padding: 10px 12px; border-radius: 10px;
+    border: 1px solid #E0E0DC; background: #F7F7F5; color: #1A1A1A;
+    resize: none; font-family: inherit; height: 80px;
+  }
+
+  textarea:focus { outline: none; border-color: #aaa; }
+  textarea::placeholder { color: #ccc; }
+
+  .checkbox-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .checkbox-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555; cursor: pointer; }
+  .checkbox-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1A1A1A; cursor: pointer; flex-shrink: 0; }
+
+  .other-input {
+    flex: 1; font-size: 13px; padding: 5px 10px;
+    border-radius: 8px; border: 1px solid #E0E0DC;
+    background: #F7F7F5; color: #1A1A1A; font-family: inherit;
+  }
+
+  .other-input:focus { outline: none; border-color: #aaa; }
+
+  .submit-btn {
+    width: calc(100% - 32px); margin: 4px 16px 0;
+    padding: 14px; font-size: 15px; font-weight: 600;
+    border-radius: 12px; background: #1A1A1A; color: #fff;
+    border: none; cursor: pointer; transition: opacity 0.15s;
+  }
+
+  .submit-btn:active { opacity: 0.8; }
+
+  .compare-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    border-bottom: 1px solid #F0F0ED;
+  }
+
+  .compare-col { padding: 10px; border-right: 1px solid #F0F0ED; }
+  .compare-col:last-child { border-right: none; }
+
+  .compare-date-label { font-size: 10px; color: #bbb; margin-bottom: 2px; }
+  .compare-date { font-size: 12px; font-weight: 500; color: #999; }
+  .compare-col.today .compare-date { color: #1A1A1A; }
+
+  .compare-field-label { font-size: 10px; color: #bbb; letter-spacing: 0.04em; margin-bottom: 5px; }
+  .compare-text { font-size: 12px; color: #888; line-height: 1.6; }
+  .compare-col.today .compare-text { color: #1A1A1A; }
+
+  .compare-dots { display: flex; gap: 3px; margin-bottom: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 2px; background: #E0E0DC; }
+  .dot.filled { background: #1A1A1A; }
+
+  .empty-col {
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px 8px; font-size: 11px; color: #ccc; text-align: center; line-height: 1.6;
+  }
+
+  .empty-state { padding: 32px 16px; text-align: center; }
+  .empty-state p { font-size: 13px; color: #bbb; line-height: 1.8; }
+
+  .last-record-badge {
+    margin: 0 16px 12px; padding: 10px 14px;
+    background: #fff; border-radius: 10px; border: 1px solid #E8E8E5;
+    font-size: 12px; color: #999;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .last-record-badge span { color: #1A1A1A; font-weight: 500; }
+
+  .history-btn {
+    display: block; width: calc(100% - 32px); margin: 4px 16px 0;
+    padding: 12px 16px; font-size: 13px; color: #888;
+    background: #fff; border: 1px solid #E8E8E5;
+    border-radius: 12px; cursor: pointer; text-align: left;
+    transition: background 0.15s;
+  }
+
+  .history-btn:hover { background: #F7F7F5; }
+
+  .back-btn { font-size: 13px; color: #999; background: none; border: none; cursor: pointer; padding: 4px 0; }
+
+  .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
+  .cal-weekday { font-size: 10px; color: #bbb; text-align: center; padding: 4px 0; }
+  .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+
+  .cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #ccc; border-radius: 8px; cursor: default;
+  }
+
+  .cal-day.has-record { color: #1A1A1A; font-weight: 500; cursor: pointer; background: #F0F0ED; }
+  .cal-day.has-record:hover { background: #E8E8E5; }
+  .cal-day.selected { background: #1A1A1A !important; color: #fff !important; }
+  .cal-day.today-marker { color: #1A1A1A; font-weight: 600; }
+  .cal-day.pinned-day { outline: 2px solid #1A1A1A; outline-offset: -2px; }
+
+  .detail-section { padding: 12px 14px; border-bottom: 1px solid #F0F0ED; }
+  .detail-section:last-child { border-bottom: none; }
+  .detail-label { font-size: 10px; color: #bbb; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .detail-text { font-size: 13px; color: #1A1A1A; line-height: 1.6; }
+
+  .pin-btn {
+    width: calc(100% - 28px); margin: 0 14px 14px;
+    padding: 10px; font-size: 13px; font-weight: 500;
+    border-radius: 10px; cursor: pointer; transition: all 0.15s;
+  }
+
+  .pin-btn.unpinned { background: #F7F7F5; border: 1px solid #E0E0DC; color: #666; }
+  .pin-btn.pinned { background: #1A1A1A; border: 1px solid #1A1A1A; color: #fff; }
+
+  .pin-badge {
+    margin: 0 16px 12px; padding: 8px 14px;
+    background: #1A1A1A; border-radius: 10px;
+    font-size: 12px; color: #fff;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .pin-badge-clear { font-size: 11px; color: #999; background: none; border: none; cursor: pointer; }
+
+  /* ===== チュートリアル ===== */
+  .tut-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 200;
+    pointer-events: none;
+  }
+
+  .tut-highlight {
+    position: fixed;
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
+    z-index: 201;
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(.4,0,.2,1);
+  }
+
+  .tut-bubble {
+    position: fixed;
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px 16px;
+    max-width: 240px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1A1A1A;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    z-index: 202;
+    pointer-events: all;
+    transition: all 0.35s cubic-bezier(.4,0,.2,1);
+  }
+
+  .tut-bubble::before {
+    content: '';
+    position: absolute;
+    width: 0; height: 0;
+    border: 8px solid transparent;
+  }
+
+  .tut-bubble.arrow-top::before {
+    top: -16px; left: 20px;
+    border-bottom-color: #fff;
+  }
+
+  .tut-bubble.arrow-bottom::before {
+    bottom: -16px; left: 20px;
+    border-top-color: #fff;
+  }
+
+  .tut-bubble.arrow-left::before {
+    left: -16px; top: 16px;
+    border-right-color: #fff;
+  }
+
+  .tut-arrow {
+    display: inline-block;
+    font-size: 18px;
+    animation: bounce 0.8s infinite alternate;
+    margin-right: 4px;
+  }
+
+  @keyframes bounce {
+    from { transform: translateX(0); }
+    to { transform: translateX(6px); }
+  }
+
+  .tut-next {
+    margin-top: 10px; width: 100%;
+    padding: 8px; font-size: 13px; font-weight: 600;
+    border-radius: 8px; background: #1A1A1A; color: #fff;
+    border: none; cursor: pointer;
+  }
+
+  .tut-skip {
+    display: block; margin-top: 6px;
+    font-size: 11px; color: #bbb;
+    background: none; border: none; cursor: pointer; width: 100%; text-align: center;
+  }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1A1A1A; color: #fff;
+    font-size: 13px; padding: 10px 20px;
+    border-radius: 999px; opacity: 0; transition: all 0.3s;
+    pointer-events: none; white-space: nowrap; z-index: 100;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="header-title">Trace</div>
+    <div class="last-record" id="lastRecordHeader">記録なし</div>
+  </div>
+
+  <div class="date-bar" id="dateBar">
+    <button class="date-nav" onclick="changeDate(-1)">‹</button>
+    <input type="date" id="datePicker" class="date-picker-inline" onchange="onDatePicked()">
+    <button class="date-nav" onclick="changeDate(1)">›</button>
+    <button class="date-today-btn" onclick="goToday()">今日</button>
+  </div>
+
+  <div class="tabs" id="mainTabs">
+    <button class="tab active" id="tabRecord" onclick="showTab('record')">記録する</button>
+    <button class="tab" id="tabCompare" onclick="showTab('compare')">振り返る</button>
+  </div>
+
+  <!-- 記録画面 -->
+  <div id="recordTab">
+    <div class="card">
+      <div class="card-section" id="tut-target-status">
+        <div class="section-label">今日の状態</div>
+        <div style="margin-top: 12px;">
+          <div class="rating-row">
+            <div class="rating-name">コンディション</div>
+            <div class="rating-buttons" id="rating-condition">
+              <button class="rating-btn" onclick="setRating('condition',1)">1</button>
+              <button class="rating-btn" onclick="setRating('condition',2)">2</button>
+              <button class="rating-btn" onclick="setRating('condition',3)">3</button>
+              <button class="rating-btn" onclick="setRating('condition',4)">4</button>
+              <button class="rating-btn" onclick="setRating('condition',5)">5</button>
+            </div>
+          </div>
+          <div class="rating-row">
+            <div class="rating-name">行動量</div>
+            <div class="rating-buttons" id="rating-action">
+              <button class="rating-btn" onclick="setRating('action',1)">1</button>
+              <button class="rating-btn" onclick="setRating('action',2)">2</button>
+              <button class="rating-btn" onclick="setRating('action',3)">3</button>
+              <button class="rating-btn" onclick="setRating('action',4)">4</button>
+              <button class="rating-btn" onclick="setRating('action',5)">5</button>
+            </div>
+          </div>
+          <div class="rating-row">
+            <div class="rating-name">メンタル</div>
+            <div class="rating-buttons" id="rating-mental">
+              <button class="rating-btn" onclick="setRating('mental',1)">1</button>
+              <button class="rating-btn" onclick="setRating('mental',2)">2</button>
+              <button class="rating-btn" onclick="setRating('mental',3)">3</button>
+              <button class="rating-btn" onclick="setRating('mental',4)">4</button>
+              <button class="rating-btn" onclick="setRating('mental',5)">5</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-section" id="tut-target-what">
+        <div class="section-label">今日の一言</div>
+        <div class="section-sublabel">進んだこと・考えたこと　何もできなかったでもOK</div>
+        <textarea id="whatInput" placeholder="今日、何した？"></textarea>
+      </div>
+      <div class="card-section">
+        <div class="section-label">今日のつまずき</div>
+        <div class="section-sublabel">（任意）引っかかったことがあれば選んでください</div>
+        <div class="checkbox-list">
+          <label class="checkbox-item"><input type="checkbox" value="体調が悪かった"> 体調が悪かった</label>
+          <label class="checkbox-item"><input type="checkbox" value="別のことが優先だった"> 別のことが優先だった</label>
+          <label class="checkbox-item"><input type="checkbox" value="やる気が出なかった"> やる気が出なかった</label>
+          <label class="checkbox-item"><input type="checkbox" value="意味を見失った"> 意味を見失った</label>
+          <label class="checkbox-item"><input type="checkbox" value="普通に怠けた"> 普通に怠けた</label>
+          <div class="checkbox-item">
+            <input type="checkbox" id="otherCheck">
+            <input type="text" class="other-input" id="otherText" placeholder="その他">
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="submit-btn" id="tut-target-save" onclick="saveRecord()">記録する</button>
+  </div>
+
+  <!-- 振り返り画面 -->
+  <div id="compareTab" class="hidden">
+    <div id="pinBadge" class="pin-badge hidden">
+      <span id="pinBadgeText">📌 —</span>
+      <button class="pin-badge-clear" onclick="clearPin()">解除</button>
+    </div>
+    <div id="lastRecordBadge" class="last-record-badge hidden">
+      前回の記録：<span id="lastRecordDays">—</span>
+    </div>
+    <div class="card">
+      <div id="compareContent"></div>
+    </div>
+    <button class="history-btn" id="tut-target-history" onclick="showTab('history')">これまでの記録 →</button>
+  </div>
+
+  <!-- カレンダー画面 -->
+  <div id="historyTab" class="hidden">
+    <div style="padding: 0 16px 12px; display: flex; align-items: center; gap: 10px;">
+      <button class="back-btn" onclick="showTab('compare')">← 戻る</button>
+      <span style="font-size: 13px; font-weight: 500; color: #1A1A1A;" id="calMonthLabel"></span>
+      <div style="margin-left: auto; display: flex; gap: 6px;">
+        <button class="date-nav" onclick="changeCalMonth(-1)">‹</button>
+        <button class="date-nav" onclick="changeCalMonth(1)">›</button>
+      </div>
+    </div>
+    <div class="card">
+      <div style="padding: 10px 8px;">
+        <div class="cal-weekdays">
+          <div class="cal-weekday">日</div><div class="cal-weekday">月</div>
+          <div class="cal-weekday">火</div><div class="cal-weekday">水</div>
+          <div class="cal-weekday">木</div><div class="cal-weekday">金</div>
+          <div class="cal-weekday">土</div>
+        </div>
+        <div class="cal-days" id="calendarGrid"></div>
+      </div>
+    </div>
+    <div id="historyDetail" class="card hidden">
+      <div id="historyDetailContent"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- チュートリアル -->
+<div class="tut-highlight hidden" id="tutHighlight"></div>
+<div class="tut-bubble hidden" id="tutBubble">
+  <div id="tutText"></div>
+  <button class="tut-next" id="tutNext" onclick="tutStep()">次へ →</button>
+  <button class="tut-skip" onclick="endTutorial()">スキップ</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let ratings = { condition: 0, action: 0, mental: 0 };
+let selectedDate = '';
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let selectedCalDate = '';
+let tutCurrentStep = 0;
+
+const tutSteps = [
+  {
+    targetId: 'tut-target-status',
+    arrowClass: 'arrow-top',
+    text: '<span class="tut-arrow">→</span>今日のコンディション・行動量・メンタルを数字でタップして記録できます。',
+    bubblePos: 'below',
+  },
+  {
+    targetId: 'tut-target-what',
+    arrowClass: 'arrow-top',
+    text: '<span class="tut-arrow">→</span>「今日の一言」に今日進めたこと、考えたことを残してみましょう。なんでもOKです。',
+    bubblePos: 'below',
+  },
+  {
+    targetId: 'tut-target-save',
+    arrowClass: 'arrow-bottom',
+    text: '<span class="tut-arrow">→</span>「記録する」を押すと自動で振り返り画面へ。記録した瞬間に過去の自分と比較できます。',
+    bubblePos: 'above',
+    nextLabel: '次へ →',
+  },
+  {
+    targetId: 'tut-target-history',
+    arrowClass: 'arrow-bottom',
+    text: '<span class="tut-arrow">→</span>「これまでの記録」からカレンダーを開き、気になる日をピン留めすると比較基準に設定できます。',
+    bubblePos: 'above',
+    isCompareTab: true,
+    nextLabel: '始める',
+  },
+];
+
+function startTutorial() {
+  tutCurrentStep = 0;
+  showTutStep(0);
+}
+
+function showTutStep(index) {
+  const step = tutSteps[index];
+  if (!step) { endTutorial(); return; }
+
+  if (step.isCompareTab) {
+    showTabSilent('compare');
+  }
+
+  setTimeout(() => {
+    const target = document.getElementById(step.targetId);
+    if (!target) { endTutorial(); return; }
+
+    const rect = target.getBoundingClientRect();
+    const pad = 6;
+
+    const hl = document.getElementById('tutHighlight');
+    hl.classList.remove('hidden');
+    hl.style.left = (rect.left - pad) + 'px';
+    hl.style.top = (rect.top - pad) + 'px';
+    hl.style.width = (rect.width + pad * 2) + 'px';
+    hl.style.height = (rect.height + pad * 2) + 'px';
+
+    const bubble = document.getElementById('tutBubble');
+    document.getElementById('tutText').innerHTML = step.text;
+    document.getElementById('tutNext').textContent = step.nextLabel || '次へ →';
+    bubble.className = `tut-bubble ${step.arrowClass}`;
+
+    if (step.bubblePos === 'below') {
+      bubble.style.top = (rect.bottom + 20) + 'px';
+      bubble.style.left = Math.min(rect.left, window.innerWidth - 260) + 'px';
+      bubble.style.bottom = '';
+    } else {
+      const bubbleTop = rect.top - 130;
+      bubble.style.top = Math.max(8, bubbleTop) + 'px';
+      bubble.style.left = Math.min(rect.left, window.innerWidth - 260) + 'px';
+      bubble.style.bottom = '';
+    }
+
+    bubble.classList.remove('hidden');
+  }, 50);
+}
+
+function tutStep() {
+  tutCurrentStep++;
+  if (tutCurrentStep >= tutSteps.length) {
+    endTutorial();
+  } else {
+    showTutStep(tutCurrentStep);
+  }
+}
+
+function endTutorial() {
+  document.getElementById('tutHighlight').classList.add('hidden');
+  document.getElementById('tutBubble').classList.add('hidden');
+  localStorage.setItem('mae_tutdone', '1');
+  showTabSilent('record');
+}
+
+// ===== アプリ本体 =====
+
+function toDateStr(date) {
+  return date.getFullYear() + '-' +
+    String(date.getMonth() + 1).padStart(2, '0') + '-' +
+    String(date.getDate()).padStart(2, '0');
+}
+
+function formatDateJP(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${parseInt(m)}月${parseInt(d)}日`;
+}
+
+function getPinnedDate() { return localStorage.getItem('mae_pin') || ''; }
+function setPinnedDate(d) { localStorage.setItem('mae_pin', d); }
+function clearPin() { localStorage.removeItem('mae_pin'); renderCompare(); updatePinBadge(); }
+
+function updatePinBadge() {
+  const pin = getPinnedDate();
+  const badge = document.getElementById('pinBadge');
+  if (pin) {
+    document.getElementById('pinBadgeText').textContent = `📌 ${formatDateJP(pin)}`;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function updateDateDisplay() {
+  const picker = document.getElementById('datePicker');
+  picker.value = selectedDate;
+  picker.max = toDateStr(new Date());
+}
+
+function changeDate(delta) {
+  const d = new Date(selectedDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  const newDate = toDateStr(d);
+  if (newDate > toDateStr(new Date())) return;
+  selectedDate = newDate;
+  updateDateDisplay();
+  loadRecordForDate();
+}
+
+function goToday() {
+  selectedDate = toDateStr(new Date());
+  updateDateDisplay();
+  loadRecordForDate();
+}
+
+function onDatePicked() {
+  const val = document.getElementById('datePicker').value;
+  if (val) { selectedDate = val; loadRecordForDate(); }
+}
+
+function loadRecordForDate() {
+  const record = getRecords().find(r => r.date === selectedDate);
+  ratings = { condition: 0, action: 0, mental: 0 };
+  document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('whatInput').value = '';
+  document.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.getElementById('otherText').value = '';
+  if (record) {
+    setRating('condition', record.condition);
+    setRating('action', record.action);
+    setRating('mental', record.mental);
+    document.getElementById('whatInput').value = record.what || '';
+    record.stumbles.forEach(s => {
+      const cb = document.querySelector(`.checkbox-list input[value="${s}"]`);
+      if (cb) cb.checked = true;
+      else if (s) { document.getElementById('otherCheck').checked = true; document.getElementById('otherText').value = s; }
+    });
+  }
+}
+
+function setRating(type, val) {
+  ratings[type] = val;
+  document.querySelectorAll(`#rating-${type} .rating-btn`).forEach((btn, i) => {
+    btn.classList.toggle('selected', i < val);
+  });
+}
+
+function getRecords() { return JSON.parse(localStorage.getItem('mae_records') || '[]'); }
+function saveRecords(records) { localStorage.setItem('mae_records', JSON.stringify(records)); }
+
+function saveRecord() {
+  const what = document.getElementById('whatInput').value.trim();
+  if (!what) { showToast('今日の一言を入力してください'); return; }
+  const stumbles = [];
+  document.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach(cb => {
+    if (cb.checked && cb.value) stumbles.push(cb.value);
+  });
+  if (document.getElementById('otherCheck').checked) {
+    const t = document.getElementById('otherText').value.trim();
+    if (t) stumbles.push(t);
+  }
+  const records = getRecords();
+  const existing = records.findIndex(r => r.date === selectedDate);
+  const record = { date: selectedDate, condition: ratings.condition, action: ratings.action, mental: ratings.mental, what, stumbles };
+  if (existing >= 0) records[existing] = record;
+  else records.push(record);
+  saveRecords(records);
+  showToast('記録しました');
+  updateLastRecord();
+  setTimeout(() => showTab('compare'), 600);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function updateLastRecord() {
+  const records = getRecords();
+  if (!records.length) return;
+  const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date));
+  const today = toDateStr(new Date());
+  const diffDays = Math.floor((new Date(today) - new Date(sorted[0].date)) / 86400000);
+  const label = diffDays === 0 ? '今日' : diffDays === 1 ? '昨日' : `${diffDays}日前`;
+  document.getElementById('lastRecordHeader').textContent = `前回：${label}`;
+  document.getElementById('lastRecordDays').textContent = label;
+  document.getElementById('lastRecordBadge').classList.remove('hidden');
+}
+
+function showTabSilent(tab) {
+  document.getElementById('recordTab').classList.toggle('hidden', tab !== 'record');
+  document.getElementById('compareTab').classList.toggle('hidden', tab !== 'compare');
+  document.getElementById('historyTab').classList.toggle('hidden', tab !== 'history');
+  document.getElementById('dateBar').classList.toggle('hidden', tab === 'history');
+  document.getElementById('mainTabs').classList.toggle('hidden', tab === 'history');
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && tab === 'record') || (i === 1 && tab === 'compare'));
+  });
+  if (tab === 'compare') { renderCompare(); updatePinBadge(); }
+  if (tab === 'history') renderCalendar();
+}
+
+function showTab(tab) {
+  showTabSilent(tab);
+}
+
+function renderCompare() {
+  const records = getRecords();
+  const content = document.getElementById('compareContent');
+  if (!records.length) {
+    content.innerHTML = `<div class="empty-state"><p>まだ記録がありません。<br>記録をつけてみましょう。</p></div>`;
+    return;
+  }
+  const today = toDateStr(new Date());
+  const yesterdayStr = toDateStr(new Date(new Date(today) - 86400000));
+  const pinnedDate = getPinnedDate();
+  const pinnedRecord = pinnedDate ? records.find(r => r.date === pinnedDate) : null;
+
+  const renderDots = (val) => {
+    let h = '<div class="compare-dots">';
+    for (let i = 1; i <= 5; i++) h += `<div class="dot${i <= val ? ' filled' : ''}"></div>`;
+    return h + '</div>';
+  };
+
+  const cols = [
+    { label: '📌 ピン留め', record: pinnedRecord, isToday: false, isEmpty: !pinnedDate },
+    { label: '昨日', record: records.find(r => r.date === yesterdayStr), isToday: false },
+    { label: '今日', record: records.find(r => r.date === today), isToday: true },
+  ];
+
+  let html = '';
+
+  html += '<div class="compare-grid" style="border-top:none;">';
+  cols.forEach(col => {
+    html += `<div class="compare-col${col.isToday ? ' today' : ''}" style="padding:10px 10px 8px;">
+      <div class="compare-date-label">${col.label}</div>
+      <div class="compare-date" style="${col.isEmpty ? 'color:#ccc;' : ''}">${col.isEmpty ? 'なし' : col.record ? formatDateJP(col.record.date) : '—'}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  html += '<div class="compare-grid">';
+  cols.forEach(col => {
+    if (col.isEmpty) {
+      html += `<div class="compare-col"><div class="empty-col">カレンダーから<br>ピン留めできます</div></div>`;
+    } else {
+      html += `<div class="compare-col${col.isToday ? ' today' : ''}">
+        <div class="compare-field-label">一言</div>
+        <div class="compare-text">${col.record ? col.record.what : '—'}</div>
+      </div>`;
+    }
+  });
+  html += '</div>';
+
+  html += '<div class="compare-grid">';
+  cols.forEach(col => {
+    if (col.isEmpty) { html += `<div class="compare-col"></div>`; return; }
+    const s = col.record && col.record.stumbles.length ? col.record.stumbles.join('・') : '—';
+    html += `<div class="compare-col${col.isToday ? ' today' : ''}">
+      <div class="compare-field-label">つまずき</div>
+      <div class="compare-text">${s}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  html += '<div class="compare-grid">';
+  cols.forEach(col => {
+    if (col.isEmpty) { html += `<div class="compare-col"></div>`; return; }
+    const c = col.record ? col.record.condition : 0;
+    const a = col.record ? col.record.action : 0;
+    const m = col.record ? col.record.mental : 0;
+    html += `<div class="compare-col${col.isToday ? ' today' : ''}">
+      <div class="compare-field-label" style="margin-bottom:6px;">コンディション</div>${renderDots(c)}
+      <div class="compare-field-label" style="margin-bottom:6px;">行動量</div>${renderDots(a)}
+      <div class="compare-field-label" style="margin-bottom:6px;">メンタル</div>${renderDots(m)}
+    </div>`;
+  });
+  html += '</div>';
+
+  content.innerHTML = html;
+}
+
+function changeCalMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const records = getRecords();
+  const recordDates = new Set(records.map(r => r.date));
+  const today = toDateStr(new Date());
+  const pinnedDate = getPinnedDate();
+  document.getElementById('calMonthLabel').textContent = `${calYear}年${calMonth + 1}月`;
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const hasRecord = recordDates.has(dateStr);
+    const isSelected = dateStr === selectedCalDate;
+    const isPinned = dateStr === pinnedDate;
+    let cls = 'cal-day';
+    if (hasRecord) cls += ' has-record';
+    if (!hasRecord && dateStr === today) cls += ' today-marker';
+    if (isSelected) cls += ' selected';
+    if (isPinned && !isSelected) cls += ' pinned-day';
+    const onclick = hasRecord ? `onclick="selectCalDay('${dateStr}')"` : '';
+    html += `<div class="${cls}" ${onclick}>${d}</div>`;
+  }
+  document.getElementById('calendarGrid').innerHTML = html;
+  if (selectedCalDate) showDetailForDate(selectedCalDate);
+}
+
+function selectCalDay(dateStr) {
+  selectedCalDate = dateStr;
+  renderCalendar();
+  showDetailForDate(dateStr);
+}
+
+function showDetailForDate(dateStr) {
+  const record = getRecords().find(r => r.date === dateStr);
+  const detail = document.getElementById('historyDetail');
+  const content = document.getElementById('historyDetailContent');
+  if (!record) { detail.classList.add('hidden'); return; }
+
+  const isPinned = getPinnedDate() === dateStr;
+
+  const renderDots = (val) => {
+    let h = '<div class="compare-dots">';
+    for (let i = 1; i <= 5; i++) h += `<div class="dot${i <= val ? ' filled' : ''}"></div>`;
+    return h + '</div>';
+  };
+
+  let html = `
+    <div class="detail-section">
+      <div class="detail-label">${formatDateJP(dateStr)}</div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-label">一言</div>
+      <div class="detail-text">${record.what}</div>
+    </div>`;
+
+  if (record.stumbles && record.stumbles.length) {
+    html += `<div class="detail-section">
+      <div class="detail-label">つまずき</div>
+      <div class="detail-text">${record.stumbles.join('・')}</div>
+    </div>`;
+  }
+
+  html += `<div class="detail-section">
+    <div style="font-size:11px;color:#bbb;margin-bottom:4px;">コンディション</div>${renderDots(record.condition)}
+    <div style="font-size:11px;color:#bbb;margin-bottom:4px;margin-top:6px;">行動量</div>${renderDots(record.action)}
+    <div style="font-size:11px;color:#bbb;margin-bottom:4px;margin-top:6px;">メンタル</div>${renderDots(record.mental)}
+  </div>`;
+
+  content.innerHTML = html;
+
+  const pinBtn = document.createElement('button');
+  pinBtn.className = `pin-btn ${isPinned ? 'pinned' : 'unpinned'}`;
+  pinBtn.textContent = isPinned ? '📌 ピン留め中（解除）' : 'この日をピン留め';
+  pinBtn.onclick = () => {
+    if (isPinned) clearPin();
+    else { setPinnedDate(dateStr); showToast(`${formatDateJP(dateStr)}をピン留めしました`); }
+    showDetailForDate(dateStr);
+    renderCalendar();
+  };
+  content.appendChild(pinBtn);
+
+  detail.classList.remove('hidden');
+}
+
+window.onload = () => {
+  selectedDate = toDateStr(new Date());
+  updateDateDisplay();
+  updateLastRecord();
+  if (!localStorage.getItem('mae_tutdone')) {
+    setTimeout(startTutorial, 400);
+  }
+};
+</script>
+</body>
+</html>
